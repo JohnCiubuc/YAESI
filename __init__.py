@@ -3,88 +3,86 @@ from flask import Flask, request, redirect, session, jsonify
 import requests
 import base64
 import os
-import json
 
-app = Flask(__name__)
-app.secret_key = os.urandom(24)
+class YAESI:
+    def _get(self, url):
+        return requests.get(url, headers=self._headers)
+    def __init__(self, client_id, client_secret, scopes):
+        self._CLIENT_ID = client_id
+        self._CLIENT_SECRET = client_secret
+        self._YA_ESI = "http://localhost:8635/"
+        self._ESI = "https://esi.evetech.net/"
+        self._USER_AGENT = 'YAESI/1.0 (X11; Linux x86_64) Flask'
+        self._AUTH_URL = 'https://login.eveonline.com/v2/oauth/authorize/'
+        self._TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token'
+        self._SCOPES = scopes
+        self._CHARACTER_ID = None
 
-CLIENT_ID = '1d10ce402ccc42b6b69ee684b0d6a3e7'
-CLIENT_SECRET = 'f7w7GXbmn459hq5dOd5bk8n2d4qp1lur5J3nXp5o'
-REDIRECT_URI = 'http://localhost:8635/callback'
-USER_AGENT = 'wormhole.checker.v1'
-AUTH_URL = 'https://login.eveonline.com/v2/oauth/authorize/'
-TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token'
-SCOPES = 'esi-location.read_location.v1'
-API = "https://esi.evetech.net/"
-CHARACTER_ID = None
+        self.app = Flask(__name__)
+        self.app.secret_key = os.urandom(24)
+        self.app.add_url_rule('/', view_func=self._home)
+        self.app.add_url_rule('/callback', view_func=self._callback)
 
-@app.route('/')
-def home():
-    state = os.urandom(16).hex()
-    session['state'] = state
-    auth_params = {
-        'response_type': 'code',
-        'redirect_uri': REDIRECT_URI,
-        'client_id': CLIENT_ID,
-        'scope': SCOPES,
-        'state': state
-    }
-    auth_url = requests.Request('GET', AUTH_URL, params=auth_params).prepare().url
-    return redirect(auth_url)
+        self.run(client_id, client_secret, scopes)
 
+    def run(self, client_id, client_secret, scopes):
+        webbrowser.open_new('http://localhost:8635')
+        self.app.run(port=8635)
 
-def get_access_token(code):
-    auth_str = f'{CLIENT_ID}:{CLIENT_SECRET}'
-    b64_auth_str = base64.b64encode(auth_str.encode()).decode()
+    def _home(self):
+        state = os.urandom(16).hex()
+        session['state'] = state
+        auth_params = {
+            'response_type': 'code',
+            'redirect_uri': self._YA_ESI + 'callback',
+            'client_id': self._CLIENT_ID,
+            'scope': self._SCOPES,
+            'state': state
+        }
+        auth_url = requests.Request('GET', self._AUTH_URL, params=auth_params).prepare().url
+        return redirect(auth_url)
 
-    headers = {
-        'Authorization': f'Basic {b64_auth_str}',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': USER_AGENT
-    }
+    def _get_access_token(self, code):
+        auth_str = f'{self._CLIENT_ID}:{self._CLIENT_SECRET}'
+        b64_auth_str = base64.b64encode(auth_str.encode()).decode()
 
-    data = {
-        'grant_type': 'authorization_code',
-        'code': code,
-        'redirect_uri': REDIRECT_URI
-    }
+        headers = {
+            'Authorization': f'Basic {b64_auth_str}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': self._USER_AGENT
+        }
 
-    response = requests.post(TOKEN_URL, headers=headers, data=data)
-    access_token = response.json()['access_token']
+        data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': self._YA_ESI + 'callback'
+        }
 
-    # Get Character ID
-    verify_headers = {
-        'Authorization': f'Bearer {access_token}',
-        'User-Agent': USER_AGENT
-    }
-    verify_response = requests.get(API + "verify", headers=verify_headers)
-    print(verify_response)
-    character_id = verify_response.json()['CharacterID']
+        response = requests.post(self._TOKEN_URL, headers=headers, data=data)
+        self._token =  response.json()['access_token']
 
-    return access_token, character_id
+        self._headers = {
+            'Authorization': f'Bearer {self._token}',
+            'User-Agent': self._USER_AGENT
+        }
 
-@app.route('/callback')
-def callback():
-    if 'state' not in session or request.args.get('state') != session['state']:
-        return 'State mismatch', 400
+        verify_response = self._get(self._ESI + 'verify')
 
-    code = request.args.get('code')
-    token, character_id = get_access_token(code)
-    character_location = get_character_location(token, character_id)
-    return jsonify(character_location)
+        return verify_response.json()['CharacterID']
 
-def get_character_location(token, character_id):
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'User-Agent': USER_AGENT
-    }
+    def _callback(self):
+        if 'state' not in session or request.args.get('state') != session['state']:
+            return 'State mismatch', 400
 
-    location_url = f'https://esi.evetech.net/latest/characters/{character_id}/location/'
-    location_response = requests.get(location_url, headers=headers)
-    if location_response.status_code == 200:
-        return location_response.json()
-    return {'error': 'Character location not found or search failed.'}
+        code = request.args.get('code')
+        self._character_id = self._get_access_token(code)
+        character_location = self.character_location()
+        return jsonify(character_location)
 
-if __name__ == "__main__":
-    webbrowser.open_new('http://localhost:8635')
-    app.run(port=8635)
+    def character_location(self):
+
+        location_url = f'https://esi.evetech.net/latest/characters/{self._character_id}/location/'
+        location_response = self._get(location_url)
+        if location_response.status_code == 200:
+            return location_response.json()
+        return {'error': 'Character location not found or search failed.'}
