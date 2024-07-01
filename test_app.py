@@ -1,4 +1,31 @@
-#import YAESI from __init__
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton
+import asyncio
+import threading
+
 from __init__ import YAESI
 
-ESI = YAESI("1d10ce402ccc42b6b69ee684b0d6a3e7", "f7w7GXbmn459hq5dOd5bk8n2d4qp1lur5J3nXp5o", "esi-location.read_location.v1")
+class SimpleApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle('Simple Qt Python App')
+        layout = QVBoxLayout()
+
+        self.button = QPushButton('Get Location', self)
+        self.button.clicked.connect(self.get_location)
+
+        layout.addWidget(self.button)
+        self.setLayout(layout)
+
+    def get_location(self):
+        print(ESI.character_location())
+
+if __name__ == '__main__':
+    ESI = YAESI("client id", "client secret", "esi-location.read_location.v1")
+    app = QApplication(sys.argv)
+    ex = SimpleApp()
+    ex.show()
+    sys.exit(app.exec_())
