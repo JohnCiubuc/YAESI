@@ -89,7 +89,9 @@ class YAESI:
         if self._character_id == -1:
             self._character_id = self._get_access_token(code)
 
-        with open('close_page.html', 'r') as f:
+        script_dir = os.path.dirname(__file__)
+        file_path = os.path.join(script_dir, 'close_page.html')
+        with open(file_path, 'r') as f:
             return f.read()
 
     def character_location(self):
