@@ -91,6 +91,7 @@ class YAESI:
         return ""
 
     def character_location(self):
+        if self._character_id == -1: return {'error': 'Authentication Pending'}
         location_url = self._ESI + "characters/" + self._character_id + '/location/'
         location_response = self._get(location_url)
         if location_response.status_code == 200:
@@ -98,6 +99,7 @@ class YAESI:
         return {'error': 'Character location not found or search failed.', 'location':location_url}
 
     def character_(self):
+        if self._character_id == -1: return {'error': 'Authentication Pending'}
         location_url = self._ESI + "characters/" + str(self._character_id) + '/location/'
         location_response = self._get(location_url)
         if location_response.status_code == 200:
