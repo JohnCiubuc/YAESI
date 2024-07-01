@@ -88,7 +88,7 @@ class YAESI:
         code = request.args.get('code')
         if self._character_id == -1:
             self._character_id = self._get_access_token(code)
-        return ""
+        return "You can close this page now"
 
     def character_location(self):
         if self._character_id == -1: return {'error': 'Authentication Pending'}
