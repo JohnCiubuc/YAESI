@@ -1,3 +1,4 @@
+
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton
 import asyncio
@@ -24,7 +25,7 @@ class SimpleApp(QWidget):
         print(ESI.character_location())
 
 if __name__ == '__main__':
-    ESI = YAESI("client id", "client secret", "esi-location.read_location.v1")
+    ESI = YAESI("client id", "client secret", ["esi-location.read_location.v1"])
     app = QApplication(sys.argv)
     ex = SimpleApp()
     ex.show()

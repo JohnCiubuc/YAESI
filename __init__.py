@@ -1,17 +1,24 @@
 import webbrowser
+import threading
 from flask import Flask, request, redirect, session, jsonify
 import requests
 import base64
 import os
+import asyncio
+from PyQt5.QtWidgets import QApplication
 
 class YAESI:
+    _character_id = -1
+
     def _get(self, url):
         return requests.get(url, headers=self._headers)
+
     def __init__(self, client_id, client_secret, scopes):
         self._CLIENT_ID = client_id
         self._CLIENT_SECRET = client_secret
         self._YA_ESI = "http://localhost:8635/"
-        self._ESI = "https://esi.evetech.net/"
+        self._ESI = "https://esi.evetech.net/latest/"
+        self._ESI_AUTH = "https://esi.evetech.net/"
         self._USER_AGENT = 'YAESI/1.0 (X11; Linux x86_64) Flask'
         self._AUTH_URL = 'https://login.eveonline.com/v2/oauth/authorize/'
         self._TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token'
@@ -23,10 +30,14 @@ class YAESI:
         self.app.add_url_rule('/', view_func=self._home)
         self.app.add_url_rule('/callback', view_func=self._callback)
 
-        self.run(client_id, client_secret, scopes)
+        self.flask_thread = threading.Thread(target=self._run_flask_app)
+        self.flask_thread.daemon = True
+        self.flask_thread.start()
 
-    def run(self, client_id, client_secret, scopes):
+        # Open the browser
         webbrowser.open_new('http://localhost:8635')
+
+    def _run_flask_app(self):
         self.app.run(port=8635)
 
     def _home(self):
@@ -59,30 +70,36 @@ class YAESI:
         }
 
         response = requests.post(self._TOKEN_URL, headers=headers, data=data)
-        self._token =  response.json()['access_token']
+        self._token = response.json()['access_token']
 
         self._headers = {
             'Authorization': f'Bearer {self._token}',
             'User-Agent': self._USER_AGENT
         }
 
-        verify_response = self._get(self._ESI + 'verify')
+        verify_response = self._get(self._ESI_AUTH + 'verify')
 
-        return verify_response.json()['CharacterID']
+        return str(verify_response.json()['CharacterID'])
 
     def _callback(self):
         if 'state' not in session or request.args.get('state') != session['state']:
             return 'State mismatch', 400
 
         code = request.args.get('code')
-        self._character_id = self._get_access_token(code)
-        character_location = self.character_location()
-        return jsonify(character_location)
+        if self._character_id == -1:
+            self._character_id = self._get_access_token(code)
+        return ""
 
     def character_location(self):
-
-        location_url = f'https://esi.evetech.net/latest/characters/{self._character_id}/location/'
+        location_url = self._ESI + "characters/" + self._character_id + '/location/'
         location_response = self._get(location_url)
         if location_response.status_code == 200:
             return location_response.json()
-        return {'error': 'Character location not found or search failed.'}
+        return {'error': 'Character location not found or search failed.', 'location':location_url}
+
+    def character_(self):
+        location_url = self._ESI + "characters/" + str(self._character_id) + '/location/'
+        location_response = self._get(location_url)
+        if location_response.status_code == 200:
+            return location_response.json()
+        return {'error': 'Character location not found or search failed.', 'location':location_url}
