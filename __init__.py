@@ -6,6 +6,7 @@ import base64
 import os
 import asyncio
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QTimer
 
 class YAESI:
     _character_id = -1
@@ -33,6 +34,8 @@ class YAESI:
         self.flask_thread = threading.Thread(target=self._run_flask_app)
         self.flask_thread.daemon = True
         self.flask_thread.start()
+
+        self._reauth_timer()
 
         # Open the browser
         webbrowser.open_new('http://localhost:8635')
@@ -85,14 +88,23 @@ class YAESI:
         if 'state' not in session or request.args.get('state') != session['state']:
             return 'State mismatch', 400
 
-        code = request.args.get('code')
+        self._code = request.args.get('code')
         if self._character_id == -1:
-            self._character_id = self._get_access_token(code)
+            self._character_id = self._get_access_token(self._code)
 
         script_dir = os.path.dirname(__file__)
         file_path = os.path.join(script_dir, 'close_page.html')
         with open(file_path, 'r') as f:
             return f.read()
+
+    def _reauth_timer(self):
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._reauth)
+        self.timer.start(600000)  # 10 mins
+
+    def _reauth(self):
+        print('Requesting Reauth')
+        self._character_id = self._get_access_token(self._code)
 
     def character_location(self):
         if self._character_id == -1: return {'error': 'Authentication Pending'}
